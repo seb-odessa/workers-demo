@@ -4,7 +4,6 @@ use std::sync::mpsc::sync_channel;
 use std::thread;
 use std::result::Result;
 use std::fmt::Debug;
-use std::ops::Drop;
 
 pub type TError = String;
 pub type TResult<T> = Result<T, TError>;
@@ -23,26 +22,6 @@ pub struct Type2 {
 pub struct Type3 {
     payload: bool,
 }
-
-impl Drop for Type1 {
-    fn drop(&mut self) {
-        println!("Dropping Type1({})", self.payload);
-    }
-}
-impl Drop for Type2 {
-    fn drop(&mut self) {
-        println!("Dropping Type3({})", self.payload);
-    }
-}
-impl Drop for Type3 {
-    fn drop(&mut self) {
-        println!("Dropping Type4({})", self.payload);
-    }
-}
-
-
-
-
 
 #[derive(Debug, PartialEq)]
 pub enum Message<T> {
@@ -65,49 +44,47 @@ where
     O: Debug,
 {
     loop {
-        let result: Message<O>;
         match try_receive(&receiver) {
             Message::Quit => {
+                println!("Message::Quit");
+                try_send(&sender, Message::Quit);
                 break;
             }
             Message::Skip(err) => {
-                result = Message::Skip(err);
-            }
+                println!("Message::Skip({})", &err);
+                try_send(&sender, Message::Skip(err));
+            },
             Message::Work(msg) => {
                 match msg {
-                    Ok(data) => result = Message::Work(process(data)),
-                    Err(err) => result = Message::Skip(err),
-                }
+                    Ok(data) => try_send(&sender, Message::Work(process(data))),
+                    Err(err) => try_send(&sender, Message::Skip(err)),
+                };
             }
         };
-        //        println!("{:#?}", &result);
-        try_send(&sender, result);
     }
-    println!("Message::Quit");
-    try_send(&sender, Message::Quit);
 }
 
 pub fn worker1(arg: Type1) -> TResult<Type2> {
-    if arg.payload < 5 {
+    if arg.payload < 6 {
         Ok(Type2 { payload: 2.0 * arg.payload as f64 })
     } else {
-        Err(format!("Payload {} more than 5", arg.payload))
+        Err(format!("Payload {} more than 6", arg.payload))
     }
 }
 
 pub fn worker2(arg: Type2) -> TResult<Type3> {
-    if arg.payload < 10.0 {
+    if arg.payload >= 6.0 {
         Ok(Type3 { payload: true })
     } else {
-        Err(format!("Payload {} more than 10", arg.payload))
+        Err(format!("Payload {} less than 6", arg.payload))
     }
 }
 
 fn main() {
     println!("Begin");
-    let (sender1, receiver1) = sync_channel(100);
-    let (sender2, receiver2) = sync_channel(100);
-    let (sender3, receiver3) = sync_channel(100);
+    let (sender1, receiver1) = sync_channel(2);
+    let (sender2, receiver2) = sync_channel(2);
+    let (sender3, receiver3) = sync_channel(2);
 
     thread::spawn(move || { worker(receiver1, sender2, worker1); });
     thread::spawn(move || { worker(receiver2, sender3, worker2); });
