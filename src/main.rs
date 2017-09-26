@@ -4,6 +4,7 @@ use std::sync::mpsc::sync_channel;
 use std::thread;
 use std::result::Result;
 use std::fmt::Debug;
+use std::ops::Drop;
 
 pub type TError = String;
 pub type TResult<T> = Result<T, TError>;
@@ -22,6 +23,26 @@ pub struct Type2 {
 pub struct Type3 {
     payload: bool,
 }
+
+impl Drop for Type1 {
+    fn drop(&mut self) {
+        println!("Dropping Type1({})", self.payload);
+    }
+}
+impl Drop for Type2 {
+    fn drop(&mut self) {
+        println!("Dropping Type3({})", self.payload);
+    }
+}
+impl Drop for Type3 {
+    fn drop(&mut self) {
+        println!("Dropping Type4({})", self.payload);
+    }
+}
+
+
+
+
 
 #[derive(Debug, PartialEq)]
 pub enum Message<T> {
@@ -82,9 +103,6 @@ pub fn worker2(arg: Type2) -> TResult<Type3> {
     }
 }
 
-
-
-
 fn main() {
     println!("Begin");
     let (sender1, receiver1) = sync_channel(100);
@@ -99,21 +117,6 @@ fn main() {
         try_send(&sender1, Message::Work(Ok(data)));
         println!("Result: {:?}", try_receive(&receiver3));
     }
-
-
-
-    // let mut zip = archive::open(archive_name)?;
-    // for i in 0..zip.len() {
-    //     let mut file = zip.by_index(i)?;
-    //     let header = archive::load_header(&mut file);
-    //     sender1.send(header).expect("The channel is broken\n");
-    //     let msg = receiver3.recv().expect("The channel is broken\n");
-    //     match msg {
-    //         Ok(fb) => println!("{}", tools::fmt_book(&fb)),
-    //         Err(Fb2Error::Done) => break,
-    //         Err(err) => println!("!!! {} -> {}", file.name(), err.description()),
-    //     }
-    // }
 
     try_send(&sender1, Message::Quit);
     assert!(try_receive(&receiver3) == Message::Quit);
